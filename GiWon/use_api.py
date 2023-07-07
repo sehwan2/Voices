@@ -3,6 +3,11 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import urllib.parse
 
+import geocoder
+
+g = geocoder.ip('me')
+print(g.latlng)
+
 url = 'http://openapi.seoul.go.kr:8088/4c504c4c73796b6d36344f70466a52/xml/citydata/1/5/' + urllib.parse.quote('경복궁')
 
 response = requests.get(url)
