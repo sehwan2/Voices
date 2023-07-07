@@ -1,0 +1,19 @@
+import geopandas as gpd
+
+import matplotlib.pyplot as plt # 데이터 시각화 라이브러리
+
+# shp 파일을 읽어와서 데이터프레임으로 변환
+# https://data.seoul.go.kr/dataList/OA-21285/F/1/datasetView.do
+# ㄴ서울시 주요 113장소 영역zip파일 다운
+gdf = gpd.read_file('C:\\Users\\오우빈\\Desktop\\POLIO\\서울시 주요 113장소 영역\\서울시 주요 113장소 영역.shp', encoding='utf-8')
+#                    ㄴ괄호 안에 폴더 위치 작성
+
+# 좌표계 WGS84
+gdf = gdf.to_crs(epsg=4326)
+
+# 지도 데이터 출력
+ax = gdf.plot(figsize=(12, 8), alpha=1, edgecolor='k')
+#             ㄴ그래프 크기     ㄴ투명도    ㄴ외곽선 색
+ax.set(title="Major Areas")
+
+plt.show()
