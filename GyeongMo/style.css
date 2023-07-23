@@ -1,0 +1,18 @@
+/* 거리표시 팝업*/
+.mPop{
+    border: 1px;
+    background-color: #FFF;
+    font-size: 12px;
+    border-color: #FF0000;
+    border-style: solid;
+    text-align: center;
+}
+/*공통사용 클래스*/
+.mPopStyle {
+    border: 1px;
+    background-color: #FFF;
+    font-size: 12px;
+    border-color: #FF0000;
+    border-style: solid;
+    text-align:left;
+}
