@@ -1,5 +1,7 @@
 import requests
 #126.98, 37.57
+#
+#
 url = "https://apis.openapi.sk.com/tmap/routes/pedestrian"
 params = {
     "version": "1",
