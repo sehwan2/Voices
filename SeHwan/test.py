@@ -33,7 +33,7 @@ wb = openpyxl.Workbook()
 sheet = wb.active
 
 # 결과 파싱
-result = response.json().parse
+result = response.json()
 # 경로에 대한 정보 추출
 routes = result['features'][0]['properties']['total']['subPaths'][0]['path']['coordinates']
 
