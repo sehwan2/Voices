@@ -34,11 +34,12 @@ if __name__ == "__main__":
     # 'geometry' 컬럼의 데이터를 WKT(Well-Known Text) 형식으로 파싱
     data['geometry'] = data['geometry'].apply(lambda x: wkt.loads(x))
 
-    # 데이터를 리스트로 변환 (각 원소는 위도와 경도의 튜플)
-    locations = [(geom.y, geom.x) if geom.geom_type == 'Point' else (geom.centroid.y, geom.centroid.x) for geom in data['geometry']]
+    # 'id'와 'geometry' 컬럼의 데이터를 튜플로 묶어 리스트로 변환
+    locations = [(row['ID'], geom.y, geom.x) if geom.geom_type == 'Point' else (row['id'], geom.centroid.y, geom.centroid.x) for index, row in data.iterrows() for geom in [row['geometry']]]
+
 
     # 지도 생성 및 중심 좌표 설정
-    map_center = [sum(lat for lat, lng in locations) / len(locations), sum(lng for lat, lng in locations) / len(locations)]
+    map_center = [sum(lat for ID, lat, lng in locations) / len(locations), sum(lng for ID, lat, lng in locations) / len(locations)]
     tmap_map = folium.Map(location=map_center, zoom_start=17)
 
     # 경로 정보를 이용하여 폴리라인 추가
@@ -67,10 +68,10 @@ if __name__ == "__main__":
 
         if points:
             # 횡단보도 위치에 마커 추가
-            for lat, lng in locations:
+            for ID, lat, lng in locations:
                 for point in points:
-                    if great_circle(point, (lat, lng)).meters < 30:  # 거리 임계값은 적절히 조절
-                        folium.Marker([lat, lng], popup="횡단보도").add_to(tmap_map)
+                    if great_circle(point, (lat, lng)).meters < 40:  # 거리 임계값은 적절히 조절
+                        folium.Marker([lat, lng], popup=f"신호등 ID: {ID}").add_to(tmap_map)
                         break
 
             folium.PolyLine(points, color="red", weight=6, opacity=0.7).add_to(tmap_map)
