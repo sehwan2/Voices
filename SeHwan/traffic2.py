@@ -7,7 +7,7 @@ import json
 app = Flask(__name__)
 
 # 데이터 파일 읽어오기
-data = pd.read_excel('C:\\Users\\user\\OneDrive\\바탕 화면\\Sehwan\\DaeguTrafficLight_InFo.xlsx')
+data = pd.read_excel('C:\\Users\\user\\OneDrive\\바탕 화면\\Sehwan\\DaeguTrafficLight_InFo.xlsx')   
 
 # 'geometry' 컬럼의 데이터를 WKT(Well-Known Text) 형식으로 파싱
 data['geometry'] = data['geometry'].apply(lambda x: wkt.loads(x))
