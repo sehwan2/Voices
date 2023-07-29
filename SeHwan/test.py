@@ -1,244 +1,137 @@
-from flask import Flask, render_template_string
+import folium
+import requests
+from shapely import wkt
+from geopy.distance import great_circle
 import pandas as pd
-import json
+from flask import Flask, render_template, request
+import time
 
-# Flask 앱 생성
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
-# 데이터 파일 읽어오기
-data = pd.read_csv('C:\\Users\\user\\OneDrive\\바탕 화면\\Sehwan\\대구광역시_신호등_20230323.csv', encoding='cp949')
+def get_tmap_route(start_x, start_y, end_x, end_y, app_key):
+    url = "https://apis.openapi.sk.com/tmap/routes/pedestrian"
+    params = {
+        "version": 1,
+        "format": "json",
+        "appKey": "PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0",
+        "startX": start_x,
+        "startY": start_y,
+        "endX": end_x,
+        "endY": end_y,
+        "reqCoordType": "WGS84GEO",
+        "resCoordType": "WGS84GEO",
+        "startName": "출발지",
+        "endName": "도착지"
+    }
+    response = requests.post(url, data=params)
+    if response.status_code == 200:
+        data = response.json()
+        if "features" in data:
+            result_data = data["features"]
+            return result_data
+    return None
+
+def get_coordinates_from_address_using_tmap_api(address, app_key):
+    url = "https://apis.openapi.sk.com/tmap/geo/fullAddrGeo"
+    params = {
+        "version": 1,
+        "format": "json",
+        "appKey": app_key,
+        "coordType": "WGS84GEO",
+        "fullAddr": address
+    }
+    response = requests.get(url, params=params)
+    print(response.json())
+    if response.status_code == 200:
+        data = response.json()
+        if "coordinateInfo" in data:
+            coordinate = data["coordinateInfo"]["coordinate"]
+            if coordinate:
+                lat = float(coordinate[0]["newLat"])
+                lon = float(coordinate[0]["newLon"])
+                return lat, lon
+    return None, None
 
 
-# 데이터를 리스트로 변환 (각 원소는 위도와 경도의 튜플)
-locations = list(zip(data['위도'], data['경도']))
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        # 사용자로부터 입력된 도착지 주소 받기
+        destination_address = request.form['destination_address']
 
-@app.route("/")
-def map():
-    # HTML + JavaScript 정의
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <title>Simple Map</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <!-- Tmap JavaScript API를 페이지에 로드 -->
-    <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0"></script>
-    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
-    <style>
-        /* 지도를 표시할 div 요소의 크기를 정의 */
-        #map_div {
-            width: 100%;
-            height: 800px;
-        }
-    </style>
-    <script type="text/javascript">
-        var map;
-        var markers = [];
-        var locations = JSON.parse('{{ locations }}');
+        # 주소 입력을 통해 도착지의 위도와 경도를 얻어내기 (Tmap API 사용)
+        app_key = "PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0"  # 본인의 Tmap API AppKey로 교체해주세요.
+        destination_latitude, destination_longitude = get_coordinates_from_address_using_tmap_api(destination_address, app_key)
 
-        function getUserLocation() {
-            // 사용자의 위치를 얻기 위해 Geolocation API 사용
-            if(navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    // 사용자의 위도와 경도
-                    var lat = position.coords.latitude;
-                    var lng = position.coords.longitude;
+        if destination_latitude is not None and destination_longitude is not None:
+            # 지도 생성 및 중심 좌표 설정
+            map_center = [destination_latitude, destination_longitude]
+            tmap_map = folium.Map(location=map_center, zoom_start=17)
 
-                    // 사용자 위치를 중심으로 지도 생성
-                    map = new Tmapv2.Map("map_div", {
-                        center: new Tmapv2.LatLng(lat, lng),
-                        width: "100%",
-                        height: "800px",
-                        zoom: 10
-                    });
+            # 실시간 위치 정보를 얻어옴 (Geolocation API 사용)
+            user_latitude = request.form.get('user_latitude')
+            user_longitude = request.form.get('user_longitude')
 
-                    // 사용자 위치에 마커 생성
-                    var userMarker = new Tmapv2.Marker({
-                        position: new Tmapv2.LatLng(lat, lng),
-                        icon: "http://tmapapi.sktelecom.com/upload/tmap/marker/pin_r_m_s.png",
-                        map: map
-                    });
+            if user_latitude and user_longitude:
+                # 경로 정보를 이용하여 폴리라인 추가
+                start_x = str(user_longitude)
+                start_y = str(user_latitude)
+                end_x = str(destination_longitude)
+                end_y = str(destination_latitude)
 
-                    // 각 신호등 위치에 마커 생성
-                    for (var i = 0; i < locations.length; i++) {
-                        var marker = new Tmapv2.Marker({
-                            position: new Tmapv2.LatLng(locations[i][0], locations[i][1]),
-                            map: map
-                        });
-                        markers.push(marker);
-                    }
-                });
-            } else {
-                alert("Geolocation is not supported by this browser.");
-            }
-        }
+                route_data = get_tmap_route(start_x, start_y, end_x, end_y, app_key)
 
-        function searchPOI() {
-            var searchKeyword = $('#searchKeyword').val();
-            var headers = {}; 
-            headers["appKey"]="PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0";
+                if route_data:
+                    points = []
+                    for feature in route_data:
+                        geometry = feature["geometry"]
+                        coords = geometry["coordinates"]
+                        if geometry["type"] == "Point":
+                            points.append((coords[1], coords[0]))
+                        elif geometry["type"] == "LineString":
+                            for coord in coords:
+                                points.append((coord[1], coord[0]))
+                        elif geometry["type"] == "MultiLineString":
+                            for line in coords:
+                                for coord in line:
+                                    points.append((coord[1], coord[0]))
 
-            $.ajax({
-                method:"GET",
-                headers : headers,
-                url:"https://apis.openapi.sk.com/tmap/pois?version=1&format=json",
-                async:false,
-                data:{
-                    "searchKeyword" : searchKeyword,
-                    "resCoordType" : "EPSG3857",
-                    "reqCoordType" : "WGS84GEO",
-                    "count" : 1
-                },
-                success:function(response){
-                    console.log(response);
-                    if (response.searchPoiInfo.pois !== undefined) {
-                        var resultpoisData = response.searchPoiInfo.pois.poi[0];
-                        var lat = Number(resultpoisData.noorLat);
-                        var lon = Number(resultpoisData.noorLon);
+                    if points:
+                        # 횡단보도 위치에 마커 추가
+                        for ID, lat, lng in locations:
+                            for point in points:
+                                if great_circle(point, (lat, lng)).meters < 40:  # 거리 임계값은 적절히 조절
+                                    folium.Marker([lat, lng], popup=f"신호등 ID: {ID}").add_to(tmap_map)
+                                    break
 
-                        console.log("code: " + request.status);
-                        console.log("lat: ", lat);
-                        console.log("lon: ", lon);
+                        folium.PolyLine(points, color="red", weight=6, opacity=0.7).add_to(tmap_map)
+                        print("경로와 근접한 마커를 지도에 표시하였습니다.")
+                    else:
+                        print("경로 정보를 가져올 수 없습니다.")
+                else:
+                    print("경로를 가져올 수 없습니다. 올바른 좌표를 입력했는지 확인하세요.")
+            else:
+                print("사용자의 위치 정보를 얻을 수 없습니다. 브라우저에서 위치 정보 제공에 동의해주세요.")
 
-                        // 새로운 위치에 마커 생성
-                        var newMarker = new Tmapv2.Marker({
-                            position: new Tmapv2.LatLng(lat, lon),
-                            map: map
-                        });
-                        markers.push(newMarker);
-                        // 기존 경로 제거 후 새로운 경로 그리기
-                        drawRoute(lat, lon);
-                    }
-                },
-                error:function(request,status,error){
-                    console.log("code:" + request.status + "\n" + "message:" + request.responseText + "\n" + "error:" + error);
-                }
-            });
-        }
+            # 대기 시간 설정 (예시로 2초로 설정)
+            time.sleep(2)
 
-        function drawRoute(destLat, destLon) {
-            var headers = {}; 
-            headers["appKey"] = "PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0";
+            # 지도를 HTML 파일로 저장
+            tmap_map.save("templates/tmap_route_map_with_traffic_light.html")
 
-            var startX = markers[0].getPosition()._lng;
-            var startY = markers[0].getPosition()._lat;
+            # 렌더링된 템플릿 반환
+            return render_template('tmap_route_map_with_traffic_light.html')
 
-            var endX = destLon;
-            var endY = destLat;
+        else:
+            return render_template('index.html', map_exists=False)
 
-            var paramOption = "car";
-                
-            $.ajax({
-                method:"POST",
-                headers : headers,
-                url:"https://apis.openapi.sk.com/tmap/routes?version=1&format=html",
-                async:false,
-                data:{
-                    "startX" : startX,
-                    "startY" : startY,
-                    "endX" : endX,
-                    "endY" : endY,
-                    "reqCoordType" : "WGS84GEO",
-                    "resCoordType" : "EPSG3857",
-                    "searchOption" : paramOption
-                },
-                success:function(response){
-                    var resultData = response.features;
+    return render_template('index.html', map_exists=False)
 
-                    var tmap = new Tmapv2.Map("map_div", {
-                        center: new Tmapv2.LatLng(startY, startX),
-                        width: "100%",
-                        height: "400px",
-                        zoom: 15
-                    });
-
-                    var routeLayer = new Tmapv2.Graphics.Layer({name:"routeLayer"});
-                    tmap.addLayer(routeLayer);
-                        
-                    var markerStartLayer = new Tmapv2.Graphics.Layer({name: "markerStartLayer"});
-                    tmap.addLayer(markerStartLayer);
-
-                    var size = new Tmapv2.base.Size(24, 38);
-                    var offset = new Tmapv2.base.Pixel(-(size.w / 2), -size.h);
-                    var icon = new Tmapv2.base.Icon('https://api2.sktelecom.com/tmap/images/start.png', size, offset);
-                    var lonlat = new Tmapv2.base.LonLat(startX, startY).transform("EPSG4326_TO_EPSG3857");
-                    var markerStart = new Tmapv2.Marker({position: new Tmapv2.LatLng(lonlat.lat, lonlat.lon), icon: icon});
-                    markerStartLayer.addMarker(markerStart);
-
-                    var markerEndLayer = new Tmapv2.Graphics.Layer({name: "markerEndLayer"});
-                    tmap.addLayer(markerEndLayer);
-                    var icon = new Tmapv2.base.Icon('https://api2.sktelecom.com/tmap/images/end.png', size, offset);
-                    var lonlat = new Tmapv2.base.LonLat(endX, endY).transform("EPSG4326_TO_EPSG3857");
-                    var markerEnd = new Tmapv2.Marker({position: new Tmapv2.LatLng(lonlat.lat, lonlat.lon), icon: icon});
-                    markerEndLayer.addMarker(markerEnd);
-
-                    var routeLineStyle = new Tmapv2.Graphics.LineStyle({strokeColor: "#dd00dd", strokeWeight: 6, strokeDashstyle: "solid", fill: true, fillColor: "#dd00dd", fillOpacity: 0.2});
-                    var routeLayer = new Tmapv2.Graphics.Layer({name:"routeLine"});
-                    tmap.addLayer(routeLayer);
-
-                    for(var i in resultData){
-                        var geometry = resultData[i].geometry;
-                        var properties = resultData[i].properties;
-
-                        if(geometry.type == "LineString"){
-                            for(var j in geometry.coordinates){
-                                var section = [];
-                                var lineString = new Tmapv2.base.Geometry.LineString();
-
-                                section[j] = geometry.coordinates[j];
-
-                                var entry = new Tmapv2.base.Entry();
-                                entry.totalDistance = properties.totalDistance;
-
-                                for(var k in section){
-                                    var order = section[k][0];
-                                    var lon = section[k][1];
-                                    var lat = section[k][2];
-
-                                    var transform = new Tmapv2.Projection.convertEPSG3857ToWGS84GEO(new Tmapv2.base.Point(lon,lat));
-                                    lineString.addPoint(new Tmapv2.base.Geometry.Point(transform._lon, transform._lat));
-
-                                    entry.lon = transform._lon;
-                                    entry.lat = transform._lat;
-                                    entry.distance = properties.distance[k];
-
-                                    lineString.entry = [];
-                                    lineString.entry.push(entry);
-                                    lineString.style = routeLineStyle;
-                                }
-                                routeLayer.addLine(lineString);
-                            }
-                        }
-                    }
-                },
-                error:function(request,status,error){
-                    console.log("code:" + request.status + "\n" + "message:" + request.responseText + "\n" + "error:" + error);
-                }
-            });
-        }
-
-        $(document).ready(function() {
-            getUserLocation();
-            $('#searchPOI').click(function() {
-                searchPOI();
-            });
-        });
-
-    </script>
-    </head>
-    <body>
-        <div>
-            <input type="text" id="searchKeyword" name="searchKeyword" value="">    
-            <button id="searchPOI">적용하기</button>
-        </div>
-        <div id="map_div"></div>
-    </body>
-    </html>
-    """
-    # Jinja2 템플릿 엔진을 이용하여 데이터를 JSON 형식으로 변환
-    rendered = render_template_string(html, locations=json.dumps(locations))
-    return rendered
-
-# 메인 모듈로 실행될 때 Flask 서버 구동
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+    # 데이터 파일 읽어오기 (CSV 형식)
+    data = pd.read_csv('C:\\Users\\user\\OneDrive\\문서\\GitHub\\Voices\\SeHwan\\대구광역시_신호등_20230323.csv', encoding='cp949')
+        
+    # '신호등관리번호', '위도', '경도' 컬럼의 데이터를 튜플로 묶어 리스트로 변환
+    locations = [(row['신호등관리번호'], row['위도'], row['경도']) for index, row in data.iterrows()]
+
+    app.run(host="0.0.0.0", port=8080, debug=True)
