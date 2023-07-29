@@ -4,6 +4,8 @@ from shapely import wkt
 from geopy.distance import great_circle
 import pandas as pd
 
+chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"  # 맥OS 경우
+
 def get_tmap_route(start_x, start_y, end_x, end_y, app_key):
     url = "https://apis.openapi.sk.com/tmap/routes/pedestrian"
     params = {
@@ -29,7 +31,7 @@ def get_tmap_route(start_x, start_y, end_x, end_y, app_key):
 
 if __name__ == "__main__":
     # 데이터 파일 읽어오기
-    data = pd.read_excel('C:\\Users\\오우빈\\Desktop\\POLIO\\오우빈(aiProject)\\DaeguTrafficLight_InFo.xlsx')
+    data = pd.read_excel('/Users/kimmo/K_circle/Voices/MINO/DaeguTrafficLight_InFo.xlsx')
 
     # 'geometry' 컬럼의 데이터를 WKT(Well-Known Text) 형식으로 파싱
     data['geometry'] = data['geometry'].apply(lambda x: wkt.loads(x))
@@ -86,4 +88,5 @@ if __name__ == "__main__":
 
     # 지도를 보여주기 위해 웹 브라우저로 실행
     import webbrowser
-    webbrowser.open("tmap_route_map_with_traffic_light.html")
+    webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
+    webbrowser.get('chrome').open('tmap_route_map_with_traffic_light.html')
