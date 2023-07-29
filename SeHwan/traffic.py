@@ -1,90 +1,117 @@
+import folium
+import requests
 from shapely import wkt
-from flask import Flask, render_template_string
+from geopy.geocoders import Nominatim
+from geopy.distance import great_circle
 import pandas as pd
-import json
 
-# Flask 앱 생성
-app = Flask(__name__)
+def get_tmap_route(start_x, start_y, end_x, end_y, app_key):
+    url = "https://apis.openapi.sk.com/tmap/routes/pedestrian"
+    params = {
+        "version": 1,
+        "format": "json",
+        "appKey": app_key,
+        "startX": start_x,
+        "startY": start_y,
+        "endX": end_x,
+        "endY": end_y,
+        "reqCoordType": "WGS84GEO",
+        "resCoordType": "WGS84GEO",
+        "startName": "출발지",
+        "endName": "도착지"
+    }
+    response = requests.post(url, data=params)
+    if response.status_code == 200:
+        data = response.json()
+        if "features" in data:
+            result_data = data["features"]
+            return result_data
+    return None
 
-# 데이터 파일 읽어오기
-data = pd.read_excel('C:\\Users\\user\\OneDrive\\바탕 화면\\Sehwan\\DaeguTrafficLight_InFo.xlsx')
+def get_coordinates_from_address_using_tmap_api(address, app_key):
+    url = "https://apis.openapi.sk.com/tmap/geo/fullAddrGeo"
+    params = {
+        "version": 1,
+        "format": "json",
+        "appKey": app_key,
+        "coordType": "WGS84GEO",
+        "fullAddr": address
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        if "coordinateInfo" in data:
+            coordinate = data["coordinateInfo"]["coordinate"][0]  # Use index 0 to access the first coordinate
+            return coordinate["lat"], coordinate["lon"]
+    return None, None
 
-# 'geometry' 컬럼의 데이터를 WKT(Well-Known Text) 형식으로 파싱
-data['geometry'] = data['geometry'].apply(lambda x: wkt.loads(x))
-
-# 데이터를 리스트로 변환 (각 원소는 위도와 경도의 튜플)
-locations = [(geom.y, geom.x) for geom in data['geometry']]
-
-@app.route("/")
-def map():
-    # HTML + JavaScript 정의
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <title>Simple Map</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <!-- Tmap JavaScript API를 페이지에 로드 -->
-    <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0"></script>
-    <style>
-        /* 지도를 표시할 div 요소의 크기를 정의 */
-        #map_div {
-            width: 100%;
-            height: 800px;
-        }
-    </style>
-    <script type="text/javascript">
-        var map;
-        var markers = [];
-        var locations = JSON.parse('{{ locations }}');
-
-        function getUserLocation() {
-            // 사용자의 위치를 얻기 위해 Geolocation API 사용
-            if(navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    // 사용자의 위도와 경도
-                    var lat = position.coords.latitude;
-                    var lng = position.coords.longitude;
-
-                    // 사용자 위치를 중심으로 지도 생성
-                    map = new Tmapv2.Map("map_div", {
-                        center: new Tmapv2.LatLng(lat, lng),
-                        width: "100%",
-                        height: "800px",
-                        zoom: 10
-                    });
-
-                    // 사용자 위치에 마커 생성
-                    var userMarker = new Tmapv2.Marker({
-                        position: new Tmapv2.LatLng(lat, lng),
-                        icon: "http://tmapapi.sktelecom.com/upload/tmap/marker/pin_r_m_s.png",
-                        map: map
-                    });
-
-                    // 각 횡단보도 위치에 마커 생성
-                    for (var i = 0; i < locations.length; i++) {
-                        var marker = new Tmapv2.Marker({
-                            position: new Tmapv2.LatLng(locations[i][0], locations[i][1]),
-                            map: map
-                        });
-                        markers.push(marker);
-                    }
-                });
-            } else {
-                alert("Geolocation is not supported by this browser.");
-            }
-        }
-    </script>
-    </head>
-    <body onload="getUserLocation()">
-        <div id="map_div"></div>
-    </body>
-    </html>
-    """
-    # Jinja2 템플릿 엔진을 이용하여 데이터를 JSON 형식으로 변환
-    rendered = render_template_string(html, locations=json.dumps(locations))
-    return rendered
-
-# 메인 모듈로 실행되면 Flask 앱 실행
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    # 데이터 파일 읽어오기 (CSV 형식)
+    data = pd.read_csv('C:\\Users\\user\\OneDrive\\바탕 화면\\Sehwan\\대구광역시_신호등_20230323.csv', encoding='cp949')
+
+    # '신호등관리번호', '위도', '경도' 컬럼의 데이터를 튜플로 묶어 리스트로 변환
+    locations = [(row['신호등관리번호'], row['위도'], row['경도']) for index, row in data.iterrows()]
+
+    # 현재 위치 정보 (예시로 대구의 위도와 경도 사용)
+    current_latitude = 35.8714
+    current_longitude = 128.6014
+
+    # 주소 입력을 통해 도착지의 위도와 경도를 얻어내기 (Tmap API 사용)
+    destination_address = "대구광역시 달서구 본동"
+    app_key = "PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0"  # 본인의 Tmap API AppKey로 교체해주세요.
+    destination_latitude, destination_longitude = get_coordinates_from_address_using_tmap_api(destination_address, app_key)
+
+    if destination_latitude is not None and destination_longitude is not None:
+        print(f"도착지 주소의 위도: {destination_latitude}, 경도: {destination_longitude}")
+
+        # 지도 생성 및 중심 좌표 설정
+        map_center = [current_latitude, current_longitude]
+        tmap_map = folium.Map(location=map_center, zoom_start=17)
+
+        # 경로 정보를 이용하여 폴리라인 추가
+        start_x = str(current_longitude)
+        start_y = str(current_latitude)
+        end_x = str(destination_longitude)
+        end_y = str(destination_latitude)
+
+        route_data = get_tmap_route(start_x, start_y, end_x, end_y, app_key)
+
+        if route_data:
+            points = []
+            for feature in route_data:
+                geometry = feature["geometry"]
+                coords = geometry["coordinates"]
+                if geometry["type"] == "Point":
+                    points.append((coords[1], coords[0]))
+                elif geometry["type"] == "LineString":
+                    for coord in coords:
+                        points.append((coord[1], coord[0]))
+                elif geometry["type"] == "MultiLineString":
+                    for line in coords:
+                        for coord in line:
+                            points.append((coord[1], coord[0]))
+
+            if points:
+                # 횡단보도 위치에 마커 추가
+                for ID, lat, lng in locations:
+                    for point in points:
+                        if great_circle(point, (lat, lng)).meters < 40:  # 거리 임계값은 적절히 조절
+                            folium.Marker([lat, lng], popup=f"신호등 ID: {ID}").add_to(tmap_map)
+                            break
+
+                folium.PolyLine(points, color="red", weight=6, opacity=0.7).add_to(tmap_map)
+                print("경로와 근접한 마커를 지도에 표시하였습니다.")
+            else:
+                print("경로 정보를 가져올 수 없습니다.")
+        else:
+            print("경로를 가져올 수 없습니다. 올바른 좌표를 입력했는지 확인하세요.")
+
+        # 지도를 HTML 파일로 저장
+        tmap_map.save("tmap_route_map_with_traffic_light.html")
+
+        # 지도를 보여주기 위해 웹 브라우저로 실행
+        import webbrowser
+        webbrowser.open("tmap_route_map_with_traffic_light.html")
+
+    else:
+        print("주소를 찾을 수 없습니다. 올바른 주소를 입력해주세요.")
