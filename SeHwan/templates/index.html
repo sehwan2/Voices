@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tmap 경로 지도</title>
+</head>
+<body>
+    <h1>Tmap 경로 지도</h1>
+
+    {% if map_exists %}
+        <iframe width="100%" height="500" src="tmap_route_map_with_traffic_light.html"></iframe>
+    {% endif %}
+
+    <form method="post" action="/">
+        <label for="destination_address">도착지 주소:</label>
+        <input type="text" name="destination_address" id="destination_address">
+        <input type="submit" value="지도 보기">
+    </form>
+</body>
+</html>
