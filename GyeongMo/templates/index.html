@@ -16,8 +16,31 @@
         <input type="submit" value="지도 보기">
     </form>
 
+    <!-- 사용자의 현재 위치 입력받기 -->
+    <button onclick="getLocation()">현재 위치 사용</button>
+    <input type="hidden" id="user_latitude" name="user_latitude" value="">
+    <input type="hidden" id="user_longitude" name="user_longitude" value="">
+
     {% if keyword %}
         <h2>검색 키워드: {{ keyword }}</h2>
     {% endif %}
+
+    <script>
+        // 위치 정보를 얻어오는 함수
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition);
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // 얻어온 위치 정보를 히든 필드에 저장하는 함수
+        function showPosition(position) {
+            document.getElementById("user_latitude").value = position.coords.latitude;
+            document.getElementById("user_longitude").value = position.coords.longitude;
+            document.getElementById("user_location_form").submit(); // 폼을 제출하여 서버로 전달
+        }
+    </script>
 </body>
 </html>
