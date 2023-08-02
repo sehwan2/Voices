@@ -7,7 +7,7 @@ from flask import Flask, render_template, request
 import time
 
 app = Flask(__name__)
-app.config['TEMPLATE_FORDER'] = '/Users/kimmo/K_circle/Voices/MINO/templates'
+app.config['TEMPLATE_FORDER'] = '/Users/yoogyeongmo/VoicesProject/GMYOO/GyeongMo/templates'
 
 def get_api_response(keyword):
     base_url = 'https://apis.openapi.sk.com/tmap/pois'  # 여기에 실제 API 주소를 입력하세요
