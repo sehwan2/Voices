@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Results</title>
+</head>
+<body>
+    <h1>Search Results</h1>
+
+    <form method="post" action="/search">
+        <label for="keyword">Keyword:</label>
+        <input type="text" name="keyword" id="keyword">
+        <input type="submit" value="Search">
+    </form>
+
+    <hr>
+
+    {% if places %}
+        <h2>Places matching "{{ keyword }}":</h2>
+        <p>Total Results: {{ places.coordinateInfo.totalCount }}</p>
+        <ul>
+            {% for place in places.coordinateInfo.coordinate %}
+                <li>{{ place.buildingName }} (Latitude: {{ place.lat }}, Longitude: {{ place.lon }})</li>
+            {% endfor %}
+        </ul>
+        <hr>
+        <!-- 페이징 링크 -->
+        {% if places.coordinateInfo.totalCount > results_per_page %}
+            <div>
+                {% if page > 1 %}
+                    <a href="?keyword={{ keyword }}&page={{ page - 1 }}">Previous</a>
+                {% endif %}
+
+                {% if (page - 1) * results_per_page + places.coordinateInfo.count < places.coordinateInfo.totalCount %}
+                    <a href="?keyword={{ keyword }}&page={{ page + 1 }}">Next</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        <p>No places found for "{{ keyword }}".</p>
+    {% endif %}
+</body>
+</html>
