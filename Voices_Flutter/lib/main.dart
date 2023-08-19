@@ -1,125 +1,165 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Flutter Web Conversion',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a blue toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+        primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: MyHomePage(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+  MyHomePage({Key? key}) : super(key: key);
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  LocationData? _currentLocation;
+  late GoogleMapController _mapController;
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
+  _getCurrentLocation() async {
+    final currentLocation = await fetchCurrentLocationFromTmap();
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _currentLocation = currentLocation;
     });
+  }
+
+  Future<LocationData?> fetchCurrentLocationFromTmap() async {
+    final url = 'TMAP_API_ENDPOINT';  // Tmap API endpoint를 입력해주세요.
+    final response = await http.get(Uri.parse(url), headers: {
+      'Authorization': 'PpgbRQ84nYWukHJFfAjA3gFoyXrOfLGazEWmhID0',  // 여기에 실제 Tmap API 키를 입력하세요.
+    });
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      // API 응답 형식에 따라 적절하게 수정하세요.
+      final latitude = data['latitude'];
+      final longitude = data['longitude'];
+
+      return LocationData.fromMap({
+        'latitude': latitude,
+        'longitude': longitude,
+      });
+    } else {
+      print('Failed to fetch data from Tmap: ${response.body}');
+      return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text("Voices"),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+      body: ListView(
+        children: [
+          Group69(),
+          SizedBox(height: 20),
+          Text(
+            'Flask로부터 가져온 데이터 또는 로직을 이 부분에 표시',
+            textAlign: TextAlign.center,
+          ),
+          if (_currentLocation != null)
+            Container(
+              height: 300, // 원하는 높이로 조정
+              child: GoogleMap(
+                onMapCreated: (GoogleMapController controller) {
+                  _mapController = controller;
+                },
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+                  zoom: 14.0,
+                ),
+                markers: {
+                  Marker(
+                    markerId: MarkerId("current_location"),
+                    position: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+                  )
+                },
+              ),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+        ],
+      ),
+    );
+  }
+}
+
+class Group69 extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity, // 원래의 크기, 필요시 조정
+          padding: EdgeInsets.all(16.0),
+          child: Stack(
+            children: [
+              // 검색바 부분
+              Container(
+                width: 880,
+                height: 127 / 3,
+                padding: EdgeInsets.symmetric(horizontal: 128 / 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TextField(
+                  style: TextStyle(
+                    fontSize: 50 / 3,
+                    fontFamily: 'Noto Sans KR',
+                    fontWeight: FontWeight.w300,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '검색',
+                    hintStyle: TextStyle(
+                      color: Colors.black.withOpacity(0.5),
+                      fontSize: 50 / 3,
+                    ),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ],
+    );
+  }
+}
+
+// 가상의 LocationData 클래스
+class LocationData {
+  final double? latitude;
+  final double? longitude;
+
+  LocationData({this.latitude, this.longitude});
+
+  factory LocationData.fromMap(Map<String, dynamic> map) {
+    return LocationData(
+      latitude: map['latitude'],
+      longitude: map['longitude'],
     );
   }
 }
