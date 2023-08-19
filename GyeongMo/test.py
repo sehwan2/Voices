@@ -7,7 +7,7 @@ from flask import Flask, render_template, request
 import time
 
 app = Flask(__name__)
-app.config['TEMPLATE_FORDER'] = '/Users/yoogyeongmo/VoicesProject/GMYOO/GyeongMo/templates'
+app.config['TEMPLATE_FORDER'] = '/Users/kimmo/K_circle/Voices/GyeongMo/templates'
 
 def get_api_response(keyword):
     base_url = 'https://apis.openapi.sk.com/tmap/pois'  # 여기에 실제 API 주소를 입력하세요
@@ -195,7 +195,7 @@ def search():
 
 if __name__ == "__main__":
     # 데이터 파일 읽어오기 (CSV 형식)
-    data = pd.read_csv('/Users/yoogyeongmo/VoicesProject/GMYOO/GyeongMo/대구광역시_신호등_20230323.csv', encoding='cp949')
+    data = pd.read_csv('/Users/kimmo/K_circle/Voices/MINO/대구광역시_신호등_20230323.csv', encoding='cp949')
 
     # '신호등관리번호', '위도', '경도' 컬럼의 데이터를 튜플로 묶어 리스트로 변환
     locations = [(row['신호등관리번호'], row['위도'], row['경도']) for index, row in data.iterrows()]
