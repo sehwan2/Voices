@@ -23,7 +23,9 @@ class _MyAppState extends State<MyApp> {
   loc.LocationData? _currentLocation;
   List<gmaps.Prediction> searchResults = [];
   Set<Polyline> _polylines = {}; // Polyline set
+  Set<Marker> _markers = {};
   PolylinePoints polylinePoints = PolylinePoints();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
@@ -58,7 +60,7 @@ class _MyAppState extends State<MyApp> {
     print("장소 검색 시작: $query");
     var url = Uri.parse(
         "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
-            "?fields=formatted_address,name,rating,opening_hours,geometry"
+            "?fields=formatted_address,name,rating,opening_hours,geometry,place_id"
             "&input=${Uri.encodeComponent(query)}"
             "&inputtype=textquery"
             "&key=$kGoogleApiKey"
@@ -71,19 +73,56 @@ class _MyAppState extends State<MyApp> {
       print("API 응답: ${jsonResponse.toString()}");  // 로그 출력
 
       if (jsonResponse["status"] == "OK") {
+        var candidates = jsonResponse["candidates"];
+
+        // 새로운 마커 집합을 생성합니다.
+        Set<Marker> newMarkers = {};
+
+        // 검색 결과를 searchResults 리스트에 저장합니다.
+        searchResults = candidates.map((candidate) => gmaps.Prediction(
+            description: candidate["name"], // name을 description으로 사용합니다.
+            placeId: candidate["place_id"]
+        )).toList();
+
+        for (var candidate in candidates) {
+          final lat = candidate["geometry"]["location"]["lat"];
+          final lng = candidate["geometry"]["location"]["lng"];
+          final placeId = candidate["place_id"];
+          final description = candidate["name"];
+
+          // 각 위치에 대해 마커를 추가합니다.
+          newMarkers.add(
+            Marker(
+              markerId: MarkerId(placeId),
+              position: LatLng(lat, lng),
+              infoWindow: InfoWindow(title: description),
+              zIndex: 10,
+              visible: true,
+            ),
+          );
+
+          // 마커 위치로 카메라를 움직입니다.
+          _mapController.animateCamera(
+              CameraUpdate.newLatLng(LatLng(lat, lng))
+          );
+        }
+
         setState(() {
-          searchResults = jsonResponse["candidates"]
-              .map<gmaps.Prediction>((data) => gmaps.Prediction.fromJson(data))
-              .toList();
-          print("검색 결과 수: ${searchResults.length}");  // 로그 출력
+          _markers = newMarkers; // 상태를 업데이트합니다.
         });
-      } else {
-        print("API 오류: ${jsonResponse["status"]}");
+
+        // 마커가 생성된 후 SnackBar 메시지를 띄웁니다.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('마커가 성공적으로 생성되었습니다.'),
+          ),
+        );
       }
-    } catch (e) {
-      print("검색 중 오류 발생: $e");
+    } catch (error) {
+      print("API 호출 중 에러 발생: $error");
     }
   }
+
 
     _addPolyline(gmaps.Prediction prediction) async {
     if (_currentLocation == null) return;
@@ -117,6 +156,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldMessengerKey,
       appBar: AppBar(
         title: Text('Voices'),
       ),
@@ -160,15 +200,16 @@ class _MyAppState extends State<MyApp> {
                       _currentLocation!.longitude!),
                   zoom: 14.0,
                 ),
-                markers: {
+                markers: _markers..add(
                   Marker(
                     markerId: MarkerId("current_location"),
                     position: LatLng(
                         _currentLocation!.latitude!,
                         _currentLocation!.longitude!),
-                  )
-                },
-                polylines: _polylines, // Polyline 추가
+                    zIndex: 10, // 여기에도 Z-Index 추가
+                  ),
+                ),
+                polylines: _polylines,
               ),
             ),
             Container(
