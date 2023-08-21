@@ -58,11 +58,20 @@ class _MyAppState extends State<MyApp> {
 
   _searchPlaces(String query) async {
     print("장소 검색 시작: $query");
+
+    if (_currentLocation == null) {
+      print("현재 위치를 알 수 없습니다.");
+      return;
+    }
+
+    var lat = _currentLocation!.latitude!;
+    var lng = _currentLocation!.longitude!;
+
     var url = Uri.parse(
-        "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
-            "?fields=formatted_address,name,rating,opening_hours,geometry,place_id"
-            "&input=${Uri.encodeComponent(query)}"
-            "&inputtype=textquery"
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            "?location=$lat,$lng"
+            "&radius=2000"  // 2km 반경 내에서 검색. 필요한 경우 조정 가능
+            "&keyword=${Uri.encodeComponent(query)}"
             "&key=$kGoogleApiKey"
     );
 
@@ -73,22 +82,24 @@ class _MyAppState extends State<MyApp> {
       print("API 응답: ${jsonResponse.toString()}");  // 로그 출력
 
       if (jsonResponse["status"] == "OK") {
-        var candidates = jsonResponse["candidates"];
+        var results = jsonResponse["results"];
 
         // 새로운 마커 집합을 생성합니다.
         Set<Marker> newMarkers = {};
 
         // 검색 결과를 searchResults 리스트에 저장합니다.
-        searchResults = candidates.map((candidate) => gmaps.Prediction(
-            description: candidate["name"], // name을 description으로 사용합니다.
-            placeId: candidate["place_id"]
-        )).toList();
+        searchResults = List<gmaps.Prediction>.from(results.map((result) {
+          return gmaps.Prediction(
+            description: result["name"], // name을 description으로 사용합니다.
+            placeId: result["place_id"],
+          );
+        }));
 
-        for (var candidate in candidates) {
-          final lat = candidate["geometry"]["location"]["lat"];
-          final lng = candidate["geometry"]["location"]["lng"];
-          final placeId = candidate["place_id"];
-          final description = candidate["name"];
+        for (var result in results) {
+          final lat = result["geometry"]["location"]["lat"];
+          final lng = result["geometry"]["location"]["lng"];
+          final placeId = result["place_id"];
+          final description = result["name"];
 
           // 각 위치에 대해 마커를 추가합니다.
           newMarkers.add(
@@ -124,6 +135,7 @@ class _MyAppState extends State<MyApp> {
   }
 
 
+
     _addPolyline(gmaps.Prediction prediction) async {
     if (_currentLocation == null) return;
 
@@ -156,7 +168,6 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldMessengerKey,
       appBar: AppBar(
         title: Text('Voices'),
       ),
@@ -200,15 +211,16 @@ class _MyAppState extends State<MyApp> {
                       _currentLocation!.longitude!),
                   zoom: 14.0,
                 ),
-                markers: _markers..add(
-                  Marker(
-                    markerId: MarkerId("current_location"),
-                    position: LatLng(
-                        _currentLocation!.latitude!,
-                        _currentLocation!.longitude!),
-                    zIndex: 10, // 여기에도 Z-Index 추가
+                markers: Set.from(_markers)
+                  ..add(
+                    Marker(
+                      markerId: MarkerId("current_location"),
+                      position: LatLng(
+                          _currentLocation!.latitude!,
+                          _currentLocation!.longitude!),
+                      zIndex: 10, // 여기에도 Z-Index 추가
+                    ),
                   ),
-                ),
                 polylines: _polylines,
               ),
             ),
@@ -232,4 +244,3 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
-
